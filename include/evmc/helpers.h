@@ -119,14 +119,18 @@ static void evmc_free_result_memory(const struct evmc_result* result)
 /// In case of memory allocation failure, the result has all fields zeroed
 /// and only evmc_result::status_code is set to ::EVMC_OUT_OF_MEMORY internal error.
 ///
-/// @param status_code  The status code.
-/// @param gas_left     The amount of gas left.
-/// @param gas_refund   The amount of refunded gas.
-/// @param output_data  The pointer to the output.
-/// @param output_size  The output size.
+/// @param status_code          The status code.
+/// @param gas_left             The amount of gas left.
+/// @param gas_refund           The amount of refunded gas.
+/// @param storage_gas_consumed The amount of storage gas consumed
+/// @param storage_gas_refund   The amount of storage gas refunded
+/// @param output_data          The pointer to the output.
+/// @param output_size          The output size.
 static inline struct evmc_result evmc_make_result(enum evmc_status_code status_code,
                                                   int64_t gas_left,
                                                   int64_t gas_refund,
+                                                  int64_t storage_gas_consumed,
+                                                  int64_t storage_gas_refund,
                                                   const uint8_t* output_data,
                                                   size_t output_size)
 {
@@ -152,6 +156,8 @@ static inline struct evmc_result evmc_make_result(enum evmc_status_code status_c
     result.status_code = status_code;
     result.gas_left = gas_left;
     result.gas_refund = gas_refund;
+    result.storage_gas_consumed = storage_gas_consumed;
+    result.storage_gas_refund = storage_gas_refund;
     return result;
 }
 
