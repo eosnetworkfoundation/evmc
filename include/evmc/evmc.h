@@ -484,6 +484,11 @@ struct evmc_result
      * The refunded storage gas accumulated from this execution
      */
     int64_t storage_gas_refund;
+
+    /**
+     * The speculative cpu gas used from this execution
+     */
+    int64_t speculative_cpu_gas_consumed;
 };
 
 
