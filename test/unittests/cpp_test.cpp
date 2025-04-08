@@ -81,6 +81,17 @@ public:
     {
         return EVMC_ACCESS_COLD;
     }
+
+    evmc::bytes32 get_transient_storage(const evmc::address& /*addr*/,
+                                        const evmc::bytes32& /*key*/) const noexcept override
+    {
+        return {};
+    }
+
+    void set_transient_storage(const evmc::address& /*addr*/,
+                               const evmc::bytes32& /*key*/,
+                               const evmc::bytes32& /*value*/) noexcept override
+    {}
 };
 
 TEST(cpp, address)
@@ -661,6 +672,14 @@ TEST(cpp, host)
     EXPECT_EQ(host.get_block_hash(0), evmc::bytes32{});
 
     host.emit_log(a, nullptr, 0, nullptr, 0);
+    ASSERT_EQ(mockedHost.recorded_logs.size(), 1);
+    EXPECT_EQ(mockedHost.recorded_logs[0].creator, a);
+
+    EXPECT_EQ(host.access_storage(a, {}), EVMC_ACCESS_COLD);
+    EXPECT_EQ(host.access_storage(a, {}), EVMC_ACCESS_WARM);
+
+    host.set_transient_storage(a, 0x01_bytes32, v);
+    EXPECT_EQ(host.get_transient_storage(a, 0x01_bytes32), v);
 }
 
 TEST(cpp, host_call)
@@ -796,24 +815,28 @@ TEST(cpp, result_create_no_output)
 TEST(cpp, result_create)
 {
     const uint8_t output[] = {1, 2};
-    auto r = evmc::Result{EVMC_FAILURE, -1, -2, -3, -4, output, sizeof(output)};
+    auto r = evmc::Result{EVMC_FAILURE, -1, -2, -3, -4, -5, -6, output, sizeof(output)};
     EXPECT_EQ(r.status_code, EVMC_FAILURE);
     EXPECT_EQ(r.gas_left, -1);
     EXPECT_EQ(r.gas_refund, -2);
-    EXPECT_EQ(r.storage_gas_consumed, -3);
-    EXPECT_EQ(r.storage_gas_refund, -4);
+    EXPECT_EQ(r.gas_cost, -3);
+    EXPECT_EQ(r.storage_gas_consumed, -4);
+    EXPECT_EQ(r.storage_gas_refund, -5);
+    EXPECT_EQ(r.speculative_cpu_gas_consumed, -6);
     ASSERT_TRUE(r.output_data);
     ASSERT_EQ(r.output_size, size_t{2});
     EXPECT_EQ(r.output_data[0], 1);
     EXPECT_EQ(r.output_data[1], 2);
 
     auto c =
-        evmc::make_result(r.status_code, r.gas_left, r.gas_refund, r.storage_gas_consumed, r.storage_gas_refund, r.output_data, r.output_size);
+        evmc::make_result(r.status_code, r.gas_left, r.gas_refund, r.gas_cost, r.storage_gas_consumed, r.storage_gas_refund, r.speculative_cpu_gas_consumed, r.output_data, r.output_size);
     EXPECT_EQ(c.status_code, r.status_code);
     EXPECT_EQ(c.gas_left, r.gas_left);
     EXPECT_EQ(c.gas_refund, r.gas_refund);
+    EXPECT_EQ(c.gas_cost, r.gas_cost);
     EXPECT_EQ(c.storage_gas_consumed, r.storage_gas_consumed);
     EXPECT_EQ(c.storage_gas_refund, r.storage_gas_refund);
+    EXPECT_EQ(c.speculative_cpu_gas_consumed, r.speculative_cpu_gas_consumed);
     ASSERT_EQ(c.output_size, r.output_size);
     EXPECT_EQ(evmc::address{c.create_address}, evmc::address{r.create_address});
     ASSERT_TRUE(c.release);
@@ -904,6 +927,7 @@ TEST(cpp, revision_to_string)
         TEST_CASE(EVMC_SHANGHAI),
         TEST_CASE(EVMC_CANCUN),
         TEST_CASE(EVMC_PRAGUE),
+        TEST_CASE(EVMC_OSAKA),
     };
 #undef TEST_CASE
 

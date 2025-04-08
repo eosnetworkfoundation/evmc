@@ -20,9 +20,6 @@ static_assert(EVMC_LATEST_STABLE_REVISION <= EVMC_MAX_REVISION,
 /// @ingroup cpp
 namespace evmc
 {
-/// String view of uint8_t chars.
-using bytes_view = std::basic_string_view<uint8_t>;
-
 /// The big-endian 160-bit hash suitable for keeping an Ethereum address.
 ///
 /// This type wraps C ::evmc_address to make sure objects of this type are always initialized.
@@ -334,6 +331,7 @@ public:
     using evmc_result::create_address;
     using evmc_result::gas_left;
     using evmc_result::gas_refund;
+    using evmc_result::gas_cost;
     using evmc_result::storage_gas_consumed;
     using evmc_result::storage_gas_refund;
     using evmc_result::speculative_cpu_gas_consumed;
@@ -354,9 +352,10 @@ public:
     explicit Result(evmc_status_code _status_code,
                     int64_t _gas_left,
                     int64_t _gas_refund,
+                    int64_t _gas_cost,
                     const uint8_t* _output_data,
                     size_t _output_size) noexcept
-      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, 0l, 0l, 0l, _output_data, _output_size)}
+      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, _gas_cost, 0l, 0l, 0l, _output_data, _output_size)}
     {}
 
     /// Creates the result from the provided arguments.
@@ -375,12 +374,13 @@ public:
     explicit Result(evmc_status_code _status_code,
                     int64_t _gas_left,
                     int64_t _gas_refund,
+                    int64_t _gas_cost,
                     int64_t _storage_gas_consumed,
                     int64_t _storage_gas_refund,
                     int64_t _speculative_cpu_gas_consumed,
                     const uint8_t* _output_data,
                     size_t _output_size) noexcept
-      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, _storage_gas_consumed, _storage_gas_refund, _speculative_cpu_gas_consumed, _output_data, _output_size)}
+      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, _gas_cost, _storage_gas_consumed, _storage_gas_refund, _speculative_cpu_gas_consumed, _output_data, _output_size)}
     {}
 
     /// Creates the result without output.
@@ -390,8 +390,9 @@ public:
     /// @param _gas_refund   The amount of refunded gas.
     explicit Result(evmc_status_code _status_code = EVMC_INTERNAL_ERROR,
                     int64_t _gas_left = 0,
-                    int64_t _gas_refund = 0) noexcept
-      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, 0l, 0l, 0l, nullptr, 0)}
+                    int64_t _gas_refund = 0,
+                    int64_t _gas_cost = 0) noexcept
+      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, _gas_cost, 0l, 0l, 0l, nullptr, 0)}
     {}
 
     /// Creates the result of contract creation.
@@ -403,8 +404,9 @@ public:
     explicit Result(evmc_status_code _status_code,
                     int64_t _gas_left,
                     int64_t _gas_refund,
+                    int64_t _gas_cost,
                     const evmc_address& _create_address) noexcept
-      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, 0l, 0l, 0l, nullptr, 0)}
+      : evmc_result{make_result(_status_code, _gas_left, _gas_refund, _gas_cost, 0l, 0l, 0l, nullptr, 0)}
     {
         create_address = _create_address;
     }
@@ -520,6 +522,15 @@ public:
 
     /// @copydoc evmc_host_interface::access_storage
     virtual evmc_access_status access_storage(const address& addr, const bytes32& key) noexcept = 0;
+
+    /// @copydoc evmc_host_interface::get_transient_storage
+    virtual bytes32 get_transient_storage(const address& addr,
+                                          const bytes32& key) const noexcept = 0;
+
+    /// @copydoc evmc_host_interface::set_transient_storage
+    virtual void set_transient_storage(const address& addr,
+                                       const bytes32& key,
+                                       const bytes32& value) noexcept = 0;
 };
 
 
@@ -617,6 +628,18 @@ public:
     evmc_access_status access_storage(const address& address, const bytes32& key) noexcept final
     {
         return host->access_storage(context, &address, &key);
+    }
+
+    bytes32 get_transient_storage(const address& address, const bytes32& key) const noexcept final
+    {
+        return host->get_transient_storage(context, &address, &key);
+    }
+
+    void set_transient_storage(const address& address,
+                               const bytes32& key,
+                               const bytes32& value) noexcept final
+    {
+        host->set_transient_storage(context, &address, &key, &value);
     }
 };
 
@@ -871,18 +894,42 @@ inline evmc_access_status access_storage(evmc_host_context* h,
 {
     return Host::from_context(h)->access_storage(*addr, *key);
 }
+
+inline evmc_bytes32 get_transient_storage(evmc_host_context* h,
+                                          const evmc_address* addr,
+                                          const evmc_bytes32* key) noexcept
+{
+    return Host::from_context(h)->get_transient_storage(*addr, *key);
+}
+
+inline void set_transient_storage(evmc_host_context* h,
+                                  const evmc_address* addr,
+                                  const evmc_bytes32* key,
+                                  const evmc_bytes32* value) noexcept
+{
+    Host::from_context(h)->set_transient_storage(*addr, *key, *value);
+}
 }  // namespace internal
 
 inline const evmc_host_interface& Host::get_interface() noexcept
 {
     static constexpr evmc_host_interface interface = {
-        ::evmc::internal::account_exists, ::evmc::internal::get_storage,
-        ::evmc::internal::set_storage,    ::evmc::internal::get_balance,
-        ::evmc::internal::get_code_size,  ::evmc::internal::get_code_hash,
-        ::evmc::internal::copy_code,      ::evmc::internal::selfdestruct,
-        ::evmc::internal::call,           ::evmc::internal::get_tx_context,
-        ::evmc::internal::get_block_hash, ::evmc::internal::emit_log,
-        ::evmc::internal::access_account, ::evmc::internal::access_storage,
+        ::evmc::internal::account_exists,
+        ::evmc::internal::get_storage,
+        ::evmc::internal::set_storage,
+        ::evmc::internal::get_balance,
+        ::evmc::internal::get_code_size,
+        ::evmc::internal::get_code_hash,
+        ::evmc::internal::copy_code,
+        ::evmc::internal::selfdestruct,
+        ::evmc::internal::call,
+        ::evmc::internal::get_tx_context,
+        ::evmc::internal::get_block_hash,
+        ::evmc::internal::emit_log,
+        ::evmc::internal::access_account,
+        ::evmc::internal::access_storage,
+        ::evmc::internal::get_transient_storage,
+        ::evmc::internal::set_transient_storage,
     };
     return interface;
 }

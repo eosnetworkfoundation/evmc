@@ -130,6 +130,7 @@ static void evmc_free_result_memory(const struct evmc_result* result)
 static inline struct evmc_result evmc_make_result(enum evmc_status_code status_code,
                                                   int64_t gas_left,
                                                   int64_t gas_refund,
+                                                  int64_t gas_cost,
                                                   int64_t storage_gas_consumed,
                                                   int64_t storage_gas_refund,
                                                   int64_t speculative_cpu_gas_consumed,
@@ -158,6 +159,7 @@ static inline struct evmc_result evmc_make_result(enum evmc_status_code status_c
     result.status_code = status_code;
     result.gas_left = gas_left;
     result.gas_refund = gas_refund;
+    result.gas_cost = gas_cost;
     result.storage_gas_consumed = storage_gas_consumed;
     result.storage_gas_refund = storage_gas_refund;
     result.speculative_cpu_gas_consumed = speculative_cpu_gas_consumed;
@@ -310,6 +312,8 @@ static inline const char* evmc_revision_to_string(enum evmc_revision rev)
         return "Cancun";
     case EVMC_PRAGUE:
         return "Prague";
+    case EVMC_OSAKA:
+        return "Osaka";
     }
     return "<unknown>";
 }
