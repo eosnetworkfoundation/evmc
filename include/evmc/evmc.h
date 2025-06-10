@@ -47,6 +47,15 @@ enum
     EVMC_ABI_VERSION = 12
 };
 
+typedef struct evmc_gas_parameters
+{
+    uint64_t G_txnewaccount;
+    uint64_t G_newaccount;
+    uint64_t G_txcreate;
+    uint64_t G_codedeposit;
+    uint64_t G_sset;
+} evmc_gas_parameters;
+
 
 /**
  * The fixed size array of 32 bytes.
@@ -1108,7 +1117,9 @@ typedef struct evmc_result (*evmc_execute_fn)(struct evmc_vm* vm,
                                               enum evmc_revision rev,
                                               const struct evmc_message* msg,
                                               uint8_t const* code,
-                                              size_t code_size);
+                                              size_t code_size,
+                                              uint64_t evm_version,
+                                              const struct evmc_gas_parameters* gas_params);
 
 /**
  * Possible capabilities of a VM.

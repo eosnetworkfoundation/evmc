@@ -95,9 +95,11 @@ static inline struct evmc_result evmc_execute(struct evmc_vm* vm,
                                               enum evmc_revision rev,
                                               const struct evmc_message* msg,
                                               uint8_t const* code,
-                                              size_t code_size)
+                                              size_t code_size,
+                                              uint64_t evm_version,
+                                              const struct evmc_gas_parameters* gas_params)
 {
-    return vm->execute(vm, host, context, rev, msg, code, code_size);
+    return vm->execute(vm, host, context, rev, msg, code, code_size, evm_version, gas_params);
 }
 
 /// The evmc_result release function using free() for releasing the memory.
